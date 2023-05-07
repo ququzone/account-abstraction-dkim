@@ -2,10 +2,14 @@ package dkim
 
 import (
 	"bufio"
+	"crypto"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/textproto"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -82,12 +86,39 @@ func stripWhitespace(s string) string {
 	}, s)
 }
 
-func Parse(data []byte) error {
+func parseTime(s string) (time.Time, error) {
+	sec, err := strconv.ParseInt(stripWhitespace(s), 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(sec, 0), nil
+}
+
+func decodeBase64String(s string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(stripWhitespace(s))
+}
+
+func parseCanonicalization(s string) (headerCan, bodyCan Canonicalization) {
+	headerCan = CanonicalizationSimple
+	bodyCan = CanonicalizationSimple
+
+	cans := strings.SplitN(stripWhitespace(s), "/", 2)
+	if cans[0] != "" {
+		headerCan = Canonicalization(cans[0])
+	}
+	if len(cans) > 1 {
+		bodyCan = Canonicalization(cans[1])
+	}
+	return
+}
+
+func Parse(data []byte) (*Header, error) {
+	header := &Header{}
 	r := strings.NewReader(string(data))
 
 	h, err := readHeader(bufio.NewReader(r))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var signature string
@@ -100,11 +131,94 @@ func Parse(data []byte) error {
 
 	params, err := parseHeaderParams(signature)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	header.Version = stripWhitespace(params["v"])
+	header.Domain = stripWhitespace(params["d"])
+	if i, ok := params["i"]; ok {
+		header.Auid = stripWhitespace(i)
+		if !strings.HasSuffix(header.Auid, "@"+header.Domain) && !strings.HasSuffix(header.Auid, "."+header.Domain) {
+			return nil, errors.New("domain mismatch")
+		}
+	} else {
+		header.Auid = "@" + header.Domain
 	}
 
 	headerKeys := parseTagList(params["h"])
-	fmt.Println(headerKeys)
+	ok := false
+	for _, k := range headerKeys {
+		if strings.EqualFold(k, "from") {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return nil, errors.New("from field not signed")
+	}
+	header.Headers = headerKeys
 
-	return nil
+	if timeStr, ok := params["t"]; ok {
+		t, err := parseTime(timeStr)
+		if err != nil {
+			return nil, err
+		}
+		header.SignatureTimestamp = t
+	}
+	if expiresStr, ok := params["x"]; ok {
+		t, err := parseTime(expiresStr)
+		if err != nil {
+			return nil, err
+		}
+		header.SignatureExpiration = t
+	}
+
+	header.Algorithm = stripWhitespace(params["a"])
+	algos := strings.SplitN(header.Algorithm, "-", 2)
+	if len(algos) != 2 {
+		return nil, errors.New("malformed algorithm name")
+	}
+	keyAlgo := algos[0]
+	hashAlgo := algos[1]
+
+	if keyAlgo != "rsa" {
+		return nil, errors.New("unsupported algorithm")
+	}
+
+	var hash crypto.Hash
+	switch hashAlgo {
+	case "sha256":
+		hash = crypto.SHA256
+	default:
+		return nil, errors.New("unsupported hash algorithm")
+	}
+	header.HashAlgo = hash
+
+	bodyHash, err := decodeBase64String(params["bh"])
+	if err != nil {
+		return nil, err
+	}
+	header.BodyHash = bodyHash
+
+	sig, err := decodeBase64String(params["b"])
+	if err != nil {
+		return nil, err
+	}
+	header.Signature = sig
+
+	headerData := make([]byte, 0)
+	headerCan, _ := parseCanonicalization(params["c"])
+	picker := newHeaderPicker(h)
+	for _, key := range headerKeys {
+		kv := picker.Pick(key)
+		if kv == "" {
+			continue
+		}
+
+		kv = canonicalizers[headerCan].CanonicalizeHeader(kv)
+		headerData = append(headerData, []byte(kv)...)
+	}
+	header.RawHeaderData = headerData
+
+	return header, nil
 }
