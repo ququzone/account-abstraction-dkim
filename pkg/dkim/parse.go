@@ -243,6 +243,14 @@ func Parse(data []byte) (*Header, error) {
 		}
 
 		kv = canonicalizers[headerCan].CanonicalizeHeader(kv)
+		if strings.EqualFold(key, "from") {
+			header.fromIndex = len(headerData) + strings.Index(kv, "<") + 1
+			header.fromLength = strings.Index(kv, ">") - strings.Index(kv, "<") - 1
+		}
+		if strings.EqualFold(key, "subject") {
+			header.subjectIndex = len(headerData) + 8
+			header.subjectLength = len(kv) - 10
+		}
 		headerData = append(headerData, []byte(kv)...)
 	}
 	canSigField := removeSignature(h[index])

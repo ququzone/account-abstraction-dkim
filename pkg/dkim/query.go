@@ -36,10 +36,7 @@ func queryDNSTXT(domain, selector string, txtLookup txtLookupFunc) (*queryResult
 	} else {
 		txts, err = net.LookupTXT(selector + "._domainkey." + domain)
 	}
-
-	if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-		return nil, err
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -86,7 +83,7 @@ func parsePublicKey(s string) (*queryResult, error) {
 			return nil, errors.New("key syntax error: not an RSA public key")
 		}
 		if rsaPub.Size()*8 < 1024 {
-			return nil, errors.New(fmt.Sprintf("key is too short: want 1024 bits, has %v bits", rsaPub.Size()*8))
+			return nil, fmt.Errorf("key is too short: want 1024 bits, has %v bits", rsaPub.Size()*8)
 		}
 		res.Verifier = &RsaVerifier{rsaPub}
 		res.KeyAlgo = "rsa"

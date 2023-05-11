@@ -3,6 +3,7 @@ package dkim
 import (
 	"crypto"
 	"crypto/rsa"
+	"math/big"
 	"strings"
 	"time"
 )
@@ -27,6 +28,10 @@ type Header struct {
 	HashAlgo            crypto.Hash
 	Verifier            Verifier
 	RawHeaderData       []byte
+	fromIndex           int
+	fromLength          int
+	subjectIndex        int
+	subjectLength       int
 }
 
 func (h *Header) Verify() error {
@@ -36,6 +41,15 @@ func (h *Header) Verify() error {
 	}
 	hashed := hasher.Sum(nil)
 	return h.Verifier.Verify(h.HashAlgo, hashed, h.Signature)
+}
+
+func (h *Header) HeaderData() []byte {
+	var meta []byte = make([]byte, 0)
+	meta = append(meta, big.NewInt(int64(h.fromIndex)).Bytes()...)
+	meta = append(meta, big.NewInt(int64(h.fromLength)).Bytes()...)
+	meta = append(meta, big.NewInt(int64(h.subjectIndex)).Bytes()...)
+	meta = append(meta, big.NewInt(int64(h.subjectLength)).Bytes()...)
+	return append(meta, h.RawHeaderData...)
 }
 
 type RsaVerifier struct {
