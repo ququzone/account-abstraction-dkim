@@ -118,7 +118,7 @@ func parseCanonicalization(s string) (headerCan, bodyCan Canonicalization) {
 	return
 }
 
-func Parse(data []byte) (*Header, error) {
+func Parse(data []byte, skipVerifier bool) (*Header, error) {
 	header := &Header{}
 	r := strings.NewReader(string(data))
 
@@ -182,23 +182,25 @@ func Parse(data []byte) (*Header, error) {
 		header.SignatureExpiration = t
 	}
 
-	methods := []string{string(queryMethodDNSTXT)}
-	if methodsStr, ok := params["q"]; ok {
-		methods = parseTagList(methodsStr)
-	}
-	var res *queryResult
-	for _, method := range methods {
-		if query, ok := queryMethods[QueryMethod(method)]; ok {
-			res, err = query(header.Domain, stripWhitespace(params["s"]), nil)
-			break
+	if skipVerifier {
+		methods := []string{string(queryMethodDNSTXT)}
+		if methodsStr, ok := params["q"]; ok {
+			methods = parseTagList(methodsStr)
 		}
+		var res *queryResult
+		for _, method := range methods {
+			if query, ok := queryMethods[QueryMethod(method)]; ok {
+				res, err = query(header.Domain, stripWhitespace(params["s"]), nil)
+				break
+			}
+		}
+		if err != nil {
+			return nil, err
+		} else if res == nil {
+			return nil, errors.New("unsupported public key query method")
+		}
+		header.Verifier = res.Verifier
 	}
-	if err != nil {
-		return nil, err
-	} else if res == nil {
-		return nil, errors.New("unsupported public key query method")
-	}
-	header.Verifier = res.Verifier
 
 	header.Algorithm = stripWhitespace(params["a"])
 	algos := strings.SplitN(header.Algorithm, "-", 2)
