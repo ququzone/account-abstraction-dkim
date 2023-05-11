@@ -29,6 +29,15 @@ type Header struct {
 	RawHeaderData       []byte
 }
 
+func (h *Header) Verify() error {
+	hasher := h.HashAlgo.New()
+	if _, err := hasher.Write(h.RawHeaderData); err != nil {
+		return err
+	}
+	hashed := hasher.Sum(nil)
+	return h.Verifier.Verify(h.HashAlgo, hashed, h.Signature)
+}
+
 type RsaVerifier struct {
 	*rsa.PublicKey
 }

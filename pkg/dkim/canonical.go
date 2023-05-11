@@ -12,7 +12,7 @@ type Canonicalization string
 
 const (
 	CanonicalizationSimple  Canonicalization = "simple"
-	CanonicalizationRelaxed                  = "relaxed"
+	CanonicalizationRelaxed Canonicalization = "relaxed"
 )
 
 type canonicalizer interface {

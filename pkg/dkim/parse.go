@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/textproto"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	headerFieldName = "DKIM-Signature"
-	crlf            = "\r\n"
+	headerFieldName   = "DKIM-Signature"
+	crlf              = "\r\n"
+	queryMethodDNSTXT = "dns/txt"
 )
 
 type header []string
@@ -98,6 +100,10 @@ func decodeBase64String(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(stripWhitespace(s))
 }
 
+func removeSignature(s string) string {
+	return regexp.MustCompile(`(b\s*=)[^;]+`).ReplaceAllString(s, "$1")
+}
+
 func parseCanonicalization(s string) (headerCan, bodyCan Canonicalization) {
 	headerCan = CanonicalizationSimple
 	bodyCan = CanonicalizationSimple
@@ -122,10 +128,13 @@ func Parse(data []byte) (*Header, error) {
 	}
 
 	var signature string
-	for _, kv := range h {
+	var index int
+	for i, kv := range h {
 		k, v := parseHeaderField(kv)
 		if strings.EqualFold(k, headerFieldName) {
 			signature = v
+			index = i
+			break
 		}
 	}
 
@@ -173,6 +182,24 @@ func Parse(data []byte) (*Header, error) {
 		header.SignatureExpiration = t
 	}
 
+	methods := []string{string(queryMethodDNSTXT)}
+	if methodsStr, ok := params["q"]; ok {
+		methods = parseTagList(methodsStr)
+	}
+	var res *queryResult
+	for _, method := range methods {
+		if query, ok := queryMethods[QueryMethod(method)]; ok {
+			res, err = query(header.Domain, stripWhitespace(params["s"]), nil)
+			break
+		}
+	}
+	if err != nil {
+		return nil, err
+	} else if res == nil {
+		return nil, errors.New("unsupported public key query method")
+	}
+	header.Verifier = res.Verifier
+
 	header.Algorithm = stripWhitespace(params["a"])
 	algos := strings.SplitN(header.Algorithm, "-", 2)
 	if len(algos) != 2 {
@@ -218,6 +245,10 @@ func Parse(data []byte) (*Header, error) {
 		kv = canonicalizers[headerCan].CanonicalizeHeader(kv)
 		headerData = append(headerData, []byte(kv)...)
 	}
+	canSigField := removeSignature(h[index])
+	canSigField = canonicalizers[headerCan].CanonicalizeHeader(canSigField)
+	canSigField = strings.TrimRight(canSigField, "\r\n")
+	headerData = append(headerData, []byte(canSigField)...)
 	header.RawHeaderData = headerData
 
 	return header, nil
