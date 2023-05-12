@@ -45,10 +45,10 @@ func (h *Header) Verify() error {
 
 func (h *Header) HeaderData() []byte {
 	var meta []byte = make([]byte, 0)
-	meta = append(meta, big.NewInt(int64(h.fromIndex)).Bytes()...)
-	meta = append(meta, big.NewInt(int64(h.fromLength)).Bytes()...)
-	meta = append(meta, big.NewInt(int64(h.subjectIndex)).Bytes()...)
-	meta = append(meta, big.NewInt(int64(h.subjectLength)).Bytes()...)
+	meta = append(meta, LeftPadBytes(big.NewInt(int64(h.fromIndex)).Bytes(), 4)...)
+	meta = append(meta, LeftPadBytes(big.NewInt(int64(h.fromLength)).Bytes(), 4)...)
+	meta = append(meta, LeftPadBytes(big.NewInt(int64(h.subjectIndex)).Bytes(), 4)...)
+	meta = append(meta, LeftPadBytes(big.NewInt(int64(h.subjectLength)).Bytes(), 4)...)
 	return append(meta, h.RawHeaderData...)
 }
 
@@ -94,4 +94,15 @@ func (p *headerPicker) Pick(key string) string {
 	}
 
 	return ""
+}
+
+func LeftPadBytes(slice []byte, l int) []byte {
+	if l <= len(slice) {
+		return slice
+	}
+
+	padded := make([]byte, l)
+	copy(padded[l-len(slice):], slice)
+
+	return padded
 }

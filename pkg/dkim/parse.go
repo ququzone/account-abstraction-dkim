@@ -182,7 +182,7 @@ func Parse(data []byte, skipVerifier bool) (*Header, error) {
 		header.SignatureExpiration = t
 	}
 
-	if skipVerifier {
+	if !skipVerifier {
 		methods := []string{string(queryMethodDNSTXT)}
 		if methodsStr, ok := params["q"]; ok {
 			methods = parseTagList(methodsStr)
@@ -246,11 +246,11 @@ func Parse(data []byte, skipVerifier bool) (*Header, error) {
 
 		kv = canonicalizers[headerCan].CanonicalizeHeader(kv)
 		if strings.EqualFold(key, "from") {
-			header.fromIndex = len(headerData) + strings.Index(kv, "<") + 1
+			header.fromIndex = len(headerData) + strings.Index(kv, "<") + 1 + 16
 			header.fromLength = strings.Index(kv, ">") - strings.Index(kv, "<") - 1
 		}
 		if strings.EqualFold(key, "subject") {
-			header.subjectIndex = len(headerData) + 8
+			header.subjectIndex = len(headerData) + 8 + 16
 			header.subjectLength = len(kv) - 10
 		}
 		headerData = append(headerData, []byte(kv)...)
