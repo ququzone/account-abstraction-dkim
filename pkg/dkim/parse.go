@@ -145,6 +145,8 @@ func Parse(data []byte, skipVerifier bool) (*Header, error) {
 
 	header.Version = stripWhitespace(params["v"])
 	header.Domain = stripWhitespace(params["d"])
+	header.Selector = stripWhitespace(params["s"])
+	header.Server = header.Selector + "." + header.Domain
 	if i, ok := params["i"]; ok {
 		header.Auid = stripWhitespace(i)
 		if !strings.HasSuffix(header.Auid, "@"+header.Domain) && !strings.HasSuffix(header.Auid, "."+header.Domain) {
@@ -252,6 +254,7 @@ func Parse(data []byte, skipVerifier bool) (*Header, error) {
 		if strings.EqualFold(key, "subject") {
 			header.subjectIndex = len(headerData) + 8 + 16
 			header.subjectLength = len(kv) - 10
+			header.Subject = kv[8 : len(kv)-2]
 		}
 		headerData = append(headerData, []byte(kv)...)
 	}

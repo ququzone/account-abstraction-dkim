@@ -19,6 +19,7 @@ type Header struct {
 	Signature           []byte
 	BodyHash            []byte
 	Domain              string
+	Server              string
 	Headers             []string
 	Auid                string
 	QueryMethods        []string
@@ -28,6 +29,7 @@ type Header struct {
 	HashAlgo            crypto.Hash
 	Verifier            Verifier
 	RawHeaderData       []byte
+	Subject             string
 	fromIndex           int
 	fromLength          int
 	subjectIndex        int
