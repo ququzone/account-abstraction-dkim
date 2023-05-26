@@ -7,7 +7,7 @@ import (
 	"github.com/emersion/go-imap/client"
 )
 
-func Receive(server, username, password string) ([][]byte, error) {
+func Fetch(server, username, password string) ([][]byte, error) {
 	// Connect to the IMAP server
 	c, err := client.DialTLS(server, nil)
 	if err != nil {

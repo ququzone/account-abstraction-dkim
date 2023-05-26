@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -59,7 +60,7 @@ func NewRecovery(keyFile, keyPassphrase, rpc string) (*Recovery, error) {
 
 func (r *Recovery) Recover(server, subject string, data, signature []byte) (string, error) {
 	prefix := fmt.Sprintf("01%d", r.chainId)
-	if !strings.HasPrefix(subject, prefix) {
+	if !strings.HasPrefix(subject, prefix) || len(subject) != len(prefix)+42+128 {
 		return "", ErrSubject
 	}
 	accountAddr := subject[len(prefix) : len(prefix)+42]
@@ -76,7 +77,8 @@ func (r *Recovery) Recover(server, subject string, data, signature []byte) (stri
 	sha := sha3.NewLegacyKeccak256()
 	sha.Write([]byte(server))
 	var serverBytes [32]byte
-	copy(sha.Sum(nil)[:], serverBytes[:32])
+	copy(serverBytes[:32], sha.Sum(nil)[:])
+	log.Printf("recovery server: %s with bytes: %s\n", server, hex.EncodeToString(serverBytes[:]))
 
 	tx, err := account.Recovery(r.transactor, serverBytes, data, signature, pubkeyBytes)
 	if err != nil {
