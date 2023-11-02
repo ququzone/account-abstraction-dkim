@@ -80,7 +80,7 @@ func (r *Recovery) Recover(server, subject string, data, signature []byte) (stri
 	copy(serverBytes[:32], sha.Sum(nil)[:])
 	log.Printf("recovery server: %s with bytes: %s\n", server, hex.EncodeToString(serverBytes[:]))
 
-	tx, err := account.Recovery(r.transactor, serverBytes, data, signature, pubkeyBytes)
+	tx, err := account.PendingRecovery(r.transactor, serverBytes, data, signature, pubkeyBytes)
 	if err != nil {
 		return "", err
 	}
