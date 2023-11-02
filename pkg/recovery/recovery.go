@@ -58,20 +58,20 @@ func NewRecovery(keyFile, keyPassphrase, rpc string) (*Recovery, error) {
 	}, nil
 }
 
-func (r *Recovery) Recover(server, subject string, data, signature []byte) (string, error) {
+func (r *Recovery) PendingRecover(server, subject string, data, signature []byte) (string, string, error) {
 	prefix := fmt.Sprintf("01%d", r.chainId)
 	if !strings.HasPrefix(subject, prefix) || len(subject) != len(prefix)+42+128 {
-		return "", ErrSubject
+		return "", "", ErrSubject
 	}
 	accountAddr := subject[len(prefix) : len(prefix)+42]
 	pubkey := subject[len(prefix)+42:]
 	pubkeyBytes, err := hex.DecodeString(pubkey)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	account, err := NewAccount(common.HexToAddress(accountAddr), r.client)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	sha := sha3.NewLegacyKeccak256()
@@ -81,6 +81,20 @@ func (r *Recovery) Recover(server, subject string, data, signature []byte) (stri
 	log.Printf("recovery server: %s with bytes: %s\n", server, hex.EncodeToString(serverBytes[:]))
 
 	tx, err := account.PendingRecovery(r.transactor, serverBytes, data, signature, pubkeyBytes)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accountAddr, tx.Hash().String(), nil
+}
+
+func (r *Recovery) Recover(accountAddr string) (string, error) {
+	account, err := NewAccount(common.HexToAddress(accountAddr), r.client)
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := account.Recovery(r.transactor)
 	if err != nil {
 		return "", err
 	}
