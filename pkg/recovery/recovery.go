@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/crypto/sha3"
 )
@@ -26,12 +25,12 @@ type Recovery struct {
 	transactor *bind.TransactOpts
 }
 
-func NewRecovery(keyFile, keyPassphrase, rpc string) (*Recovery, error) {
-	keyData, err := os.ReadFile(keyFile)
+func NewRecovery(key, rpc string) (*Recovery, error) {
+	keyBytes, err := hex.DecodeString(key)
 	if err != nil {
 		return nil, err
 	}
-	keystore, err := keystore.DecryptKey(keyData, keyPassphrase)
+	privKey, err := crypto.ToECDSA(keyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +45,7 @@ func NewRecovery(keyFile, keyPassphrase, rpc string) (*Recovery, error) {
 		return nil, err
 	}
 
-	transactor, err := bind.NewKeyedTransactorWithChainID(keystore.PrivateKey, chainId)
+	transactor, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
 	if err != nil {
 		return nil, err
 	}

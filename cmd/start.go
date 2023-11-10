@@ -25,8 +25,7 @@ func start() *cli.Command {
 			}
 
 			recovery, err := recovery.NewRecovery(
-				os.Getenv("KEY_FILE"),
-				os.Getenv("KEY_PASSPHRASE"),
+				os.Getenv("PRIVATE_KEY"),
 				os.Getenv("RPC"),
 			)
 			if err != nil {
