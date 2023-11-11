@@ -3,12 +3,16 @@ FROM golang:1.19 AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY *.go ./
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o /server
+RUN --mount=type=bind,source=cmd,target=cmd \
+    --mount=type=bind,source=pkg,target=pkg \
+    --mount=type=bind,source=main.go,target=main.go \
+    --mount=type=bind,source=go.mod,target=go.mod \
+    --mount=type=bind,source=go.sum,target=go.sum \
+    <<EOF
+set -e
+go mod download
+CGO_ENABLED=0 GOOS=linux go build -o /bin/server
+EOF
 
 # Run the tests in the container
 FROM builder AS tester
@@ -23,8 +27,8 @@ RUN apt-get update \
 
 WORKDIR /
 
-COPY --from=builder /server /server
+COPY --from=builder /bin/server /bin/server
 
 USER nonroot:nonroot
 
-ENTRYPOINT ["/server", "start"]
+ENTRYPOINT ["/bin/server", "start"]
