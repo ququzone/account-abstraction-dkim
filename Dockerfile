@@ -31,4 +31,4 @@ COPY --from=builder /bin/server /bin/server
 
 USER nonroot:nonroot
 
-ENTRYPOINT ["/bin/server", "start"]
+CMD ["/bin/server", "start"]
