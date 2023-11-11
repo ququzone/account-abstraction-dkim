@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -128,6 +129,8 @@ ioPay Team`)
 					}
 				}
 			}()
+
+			fmt.Println("dkim server started")
 
 			select {}
 		},
