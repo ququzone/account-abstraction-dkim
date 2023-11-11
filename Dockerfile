@@ -29,6 +29,4 @@ WORKDIR /
 
 COPY --from=builder /bin/server /bin/server
 
-USER nonroot:nonroot
-
 CMD ["/bin/server", "start"]
