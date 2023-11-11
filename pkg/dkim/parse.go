@@ -250,6 +250,7 @@ func Parse(data []byte, skipVerifier bool) (*Header, error) {
 		if strings.EqualFold(key, "from") {
 			header.fromIndex = len(headerData) + strings.Index(kv, "<") + 1 + 16
 			header.fromLength = strings.Index(kv, ">") - strings.Index(kv, "<") - 1
+			header.From = kv[strings.Index(kv, "<")+1 : strings.Index(kv, "<")+1+header.fromLength]
 		}
 		if strings.EqualFold(key, "subject") {
 			header.subjectIndex = len(headerData) + 8 + 16

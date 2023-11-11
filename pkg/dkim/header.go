@@ -30,6 +30,7 @@ type Header struct {
 	Verifier            Verifier
 	RawHeaderData       []byte
 	Subject             string
+	From                string
 	fromIndex           int
 	fromLength          int
 	subjectIndex        int

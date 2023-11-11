@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"gopkg.in/gomail.v2"
 
 	"github.com/ququzone/account-abstraction-dkim/pkg/db"
 	"github.com/ququzone/account-abstraction-dkim/pkg/dkim"
@@ -61,6 +62,26 @@ func start() *cli.Command {
 						if err != nil {
 							log.Printf("recovery account error: %v\n", err)
 							continue
+						}
+
+						// send recovery notice email
+						m := gomail.NewMessage()
+						m.SetHeader("From", os.Getenv("IMAP_USERNAME"))
+						m.SetHeader("To", header.From)
+						m.SetHeader("Subject", "Important Information Regarding Your ioPay AA Wallet Recovery Process")
+						m.SetBody("text/plain", `Dear User,
+
+I hope this message finds you well. I am writing to provide you with the recovery process is begin for your ioPay AA Wallet. 
+
+I would like to inform you that, as part of our stringent security measures designed to protect your assets, the recovery wallet will only become operational after a 24-hour period. This delay is a precautionary measure to ensure the safety of your assets and to prevent any unauthorized access.
+
+Thank you for your understanding and patience during this process. We are committed to providing you with a secure and reliable service. If you have any questions or need further assistance, please do not hesitate to contact us.
+
+Best Regards,
+ioPay Team`)
+						d := gomail.NewDialer(os.Getenv("SMTP_SERVER"), 587, os.Getenv("IMAP_USERNAME"), os.Getenv("IMAP_PASSWORD"))
+						if err := d.DialAndSend(m); err != nil {
+							log.Printf("send recovery notice email error: %v\n", err)
 						}
 
 						recovery := db.Recovery{
