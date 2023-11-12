@@ -2,7 +2,11 @@ name: Create and publish a Docker image
 
 on:
   push:
-    branches: ['release']
+    tags:        
+      - 'v*'
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -11,6 +15,12 @@ jobs:
       -
         name: Checkout
         uses: actions/checkout@v4
+      - 
+        name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
       -
         name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -18,13 +28,11 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      -
         name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ github.repository }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
