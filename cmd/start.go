@@ -54,7 +54,7 @@ func start() *cli.Command {
 							log.Printf("parse email error: %v\n", err)
 							continue
 						}
-						account, hash, err := recovery.PendingRecover(
+						chainId, account, hash, err := recovery.PendingRecover(
 							header.Server,
 							header.Subject,
 							header.HeaderData(),
@@ -86,6 +86,7 @@ ioPay Team`)
 						}
 
 						recovery := db.Recovery{
+							ChainId: chainId,
 							TxHash:  hash,
 							Account: account,
 							Status:  0,
@@ -111,7 +112,7 @@ ioPay Team`)
 						continue
 					}
 					for _, r := range recoveries {
-						hash, err := recovery.Recover(r.Account)
+						hash, err := recovery.Recover(r.ChainId, r.Account)
 						if err != nil {
 							log.Printf("recover account error: %v\n", err)
 							r.Status = 2

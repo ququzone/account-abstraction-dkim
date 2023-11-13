@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,12 +18,16 @@ import (
 
 var (
 	ErrSubject = errors.New("error email subject")
+	ErrChainId = errors.New("error chainId")
 )
 
-type Recovery struct {
-	chainId    uint64
+type Recoveror struct {
 	client     *ethclient.Client
 	transactor *bind.TransactOpts
+}
+
+type Recovery struct {
+	recoveror map[uint64]*Recoveror
 }
 
 func NewRecovery(key, rpc string) (*Recovery, error) {
@@ -35,42 +40,63 @@ func NewRecovery(key, rpc string) (*Recovery, error) {
 		return nil, err
 	}
 
-	client, err := ethclient.Dial(rpc)
-	if err != nil {
-		return nil, err
-	}
+	rpcs := strings.Split(rpc, ",")
+	recoveror := make(map[uint64]*Recoveror, len(rpcs))
+	for _, v := range rpcs {
+		client, err := ethclient.Dial(v)
+		if err != nil {
+			return nil, err
+		}
 
-	chainId, err := client.ChainID(context.Background())
-	if err != nil {
-		return nil, err
-	}
+		chainId, err := client.ChainID(context.Background())
+		if err != nil {
+			return nil, err
+		}
 
-	transactor, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
-	if err != nil {
-		return nil, err
+		transactor, err := bind.NewKeyedTransactorWithChainID(privKey, chainId)
+		if err != nil {
+			return nil, err
+		}
+
+		recoveror[chainId.Uint64()] = &Recoveror{
+			client,
+			transactor,
+		}
 	}
 
 	return &Recovery{
-		chainId:    chainId.Uint64(),
-		client:     client,
-		transactor: transactor,
+		recoveror,
 	}, nil
 }
 
-func (r *Recovery) PendingRecover(server, subject string, data, signature []byte) (string, string, error) {
-	prefix := fmt.Sprintf("01%d", r.chainId)
+func (r *Recovery) PendingRecover(server, subject string, data, signature []byte) (uint64, string, string, error) {
+	if !strings.Contains(subject, "0x") {
+		return 0, "", "", ErrSubject
+	}
+	chainIdStr := subject[2:strings.Index(subject, "0x")]
+	chainId, err := strconv.ParseUint(chainIdStr, 10, 64)
+	if err != nil {
+		return 0, "", "", ErrChainId
+	}
+	prefix := fmt.Sprintf("01%d", chainId)
+
 	if !strings.HasPrefix(subject, prefix) || len(subject) != len(prefix)+42+128 {
-		return "", "", ErrSubject
+		return 0, "", "", ErrSubject
+	}
+
+	recoveror, ok := r.recoveror[chainId]
+	if !ok {
+		return 0, "", "", ErrChainId
 	}
 	accountAddr := subject[len(prefix) : len(prefix)+42]
 	pubkey := subject[len(prefix)+42:]
 	pubkeyBytes, err := hex.DecodeString(pubkey)
 	if err != nil {
-		return "", "", err
+		return 0, "", "", err
 	}
-	account, err := NewAccount(common.HexToAddress(accountAddr), r.client)
+	account, err := NewAccount(common.HexToAddress(accountAddr), recoveror.client)
 	if err != nil {
-		return "", "", err
+		return 0, "", "", err
 	}
 
 	sha := sha3.NewLegacyKeccak256()
@@ -79,21 +105,26 @@ func (r *Recovery) PendingRecover(server, subject string, data, signature []byte
 	copy(serverBytes[:32], sha.Sum(nil)[:])
 	log.Printf("recovery server: %s with bytes: %s\n", server, hex.EncodeToString(serverBytes[:]))
 
-	tx, err := account.PendingRecovery(r.transactor, serverBytes, data, signature, pubkeyBytes)
+	tx, err := account.PendingRecovery(recoveror.transactor, serverBytes, data, signature, pubkeyBytes)
 	if err != nil {
-		return "", "", err
+		return 0, "", "", err
 	}
 
-	return accountAddr, tx.Hash().String(), nil
+	return chainId, accountAddr, tx.Hash().String(), nil
 }
 
-func (r *Recovery) Recover(accountAddr string) (string, error) {
-	account, err := NewAccount(common.HexToAddress(accountAddr), r.client)
+func (r *Recovery) Recover(chainId uint64, accountAddr string) (string, error) {
+	recoveror, ok := r.recoveror[chainId]
+	if !ok {
+		return "", ErrChainId
+	}
+
+	account, err := NewAccount(common.HexToAddress(accountAddr), recoveror.client)
 	if err != nil {
 		return "", err
 	}
 
-	tx, err := account.Recovery(r.transactor)
+	tx, err := account.Recovery(recoveror.transactor)
 	if err != nil {
 		return "", err
 	}
