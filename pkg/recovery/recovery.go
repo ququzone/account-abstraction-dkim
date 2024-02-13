@@ -80,7 +80,7 @@ func (r *Recovery) PendingRecover(server, subject string, data, signature []byte
 	}
 	prefix := fmt.Sprintf("01%d", chainId)
 
-	if !strings.HasPrefix(subject, prefix) || len(subject) != len(prefix)+42+128 {
+	if !strings.HasPrefix(subject, prefix) || len(subject) <= len(prefix)+42 {
 		return 0, "", "", ErrSubject
 	}
 
